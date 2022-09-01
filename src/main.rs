@@ -3,8 +3,8 @@ use opencv::core::{flip};
 use opencv::videoio::*;
 use opencv::{
 	prelude::*,
-    videoio,
-    highgui::*,
+	videoio,
+	highgui::*,
 };
 
 mod utils;
@@ -28,7 +28,7 @@ fn main() {
 		if frame.size().unwrap().width > 0 {
 			// flip the image horizontally
 			let mut flipped = Mat::default();
-    		flip(&frame, &mut flipped, 1).expect("flip [FAILED]");
+			flip(&frame, &mut flipped, 1).expect("flip [FAILED]");
 
 			let resized_img = resize_with_padding(&flipped, [257, 257]);
 
