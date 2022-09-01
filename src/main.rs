@@ -20,6 +20,7 @@ fn main() {
 	// open camera
 	let mut cam = videoio::VideoCapture::new(0, videoio::CAP_ANY).unwrap(); // 0 is the default camera
 	videoio::VideoCapture::is_opened(&cam).expect("Open camera [FAILED]");
+	cam.set(CAP_PROP_FPS, 30.0).expect("Set camera FPS [FAILED]");
 
 	loop {
 		let mut frame = Mat::default();
