@@ -1,5 +1,4 @@
-use std::slice::from_raw_parts;
-use opencv::core::{flip};
+use opencv::core::{flip, Vec3b};
 use opencv::videoio::*;
 use opencv::{
 	prelude::*,
@@ -9,13 +8,15 @@ use opencv::{
 
 mod utils;
 use utils::*;
+use tflitec::interpreter::{Interpreter, Options};
 
 fn main() {
 	// load model and create interpreter
-	let mut interpreter = load_model("resource/posenet_mobilenet_v1_100_257x257_multi_kpt_stripped.tflite");
-	let input_index = interpreter.inputs().to_vec()[0];
-	let output_heatmap_index = interpreter.outputs().to_vec()[0];
-	let output_offset_index = interpreter.outputs().to_vec()[1];
+	let options = Options::default();
+	let path = format!("resource/lite-model_movenet_singlepose_lightning_tflite_int8_4.tflite");
+	let interpreter = Interpreter::with_model_path(&path, Some(options)).unwrap();
+	interpreter.allocate_tensors().expect("Allocate tensors [FAILED]");
+	// Resize input
 	
 	// open camera
 	let mut cam = videoio::VideoCapture::new(0, videoio::CAP_ANY).unwrap(); // 0 is the default camera
@@ -30,24 +31,22 @@ fn main() {
 			// flip the image horizontally
 			let mut flipped = Mat::default();
 			flip(&frame, &mut flipped, 1).expect("flip [FAILED]");
+			// resize the image as a square, size is 
+			let resized_img = resize_with_padding(&flipped, [192, 192]);
 
-			let resized_img = resize_with_padding(&flipped, [257, 257]);
-
-			// get slice of buffer for fast copy
-			let input_buffer = interpreter.tensor_data_mut::<f32>(input_index).unwrap();
-			let data_buffer = unsafe { from_raw_parts(resized_img.data(), 257 * 257 * 3) };
-			for i in 0..257 * 257 * 3 {
-				// normalize pixel value to [-0.5, 0.5]
-				input_buffer[i] = data_buffer[i] as f32 / 127.5 - 1.0;
-			}
-			// the interpreter is quite slow
+			// turn Mat into Vec<u8>
+			let vec_2d: Vec<Vec<Vec3b>> = resized_img.to_vec_2d().unwrap();
+			let vec_1d: Vec<u8> = vec_2d.iter().flat_map(|v| v.iter().flat_map(|w| w.as_slice())).cloned().collect();
+			// set input (tensor0)
+			interpreter.copy(&vec_1d[..], 0).unwrap();
+			
+			// run interpreter
 			interpreter.invoke().expect("Invoke [FAILED]");
 
 			// get output
-			let output_heatmap: &[f32] = interpreter.tensor_data(output_heatmap_index).unwrap();
-			let output_offset: &[f32] = interpreter.tensor_data(output_offset_index).unwrap();
-			draw_keypoints(&mut flipped, output_heatmap, output_offset, 0.25);
-			imshow("PoseNet", &flipped).expect("imshow [ERROR]");
+			let output_tensor = interpreter.output(0).unwrap();
+			draw_keypoints(&mut flipped, output_tensor.data::<f32>(), 0.25);
+			imshow("MoveNet", &flipped).expect("imshow [ERROR]");
 		}
 		// keypress check
 		let key = wait_key(1).unwrap();
