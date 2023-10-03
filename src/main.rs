@@ -9,12 +9,14 @@ use opencv::{
 mod utils;
 use utils::*;
 use tflitec::interpreter::{Interpreter, Options};
+use tflitec::model::Model;
 
 fn main() {
 	// load model and create interpreter
 	let options = Options::default();
 	let path = format!("resource/lite-model_movenet_singlepose_lightning_tflite_int8_4.tflite");
-	let interpreter = Interpreter::with_model_path(&path, Some(options)).unwrap();
+	let model = Model::new(&path).expect("Load model [FAILED]");
+	let interpreter = Interpreter::new(&model, Some(options)).expect("Create interpreter [FAILED]");
 	interpreter.allocate_tensors().expect("Allocate tensors [FAILED]");
 	// Resize input
 	
